@@ -85,6 +85,9 @@ cd FaceGen
 conda env create -f stylegan3/environment.yml
 conda activate stylegan3
 
+# For StyleCLIP you will also need the following
+pip install git+https://github.com/openai/CLIP.git
+
 # Run the following command
 python gen_faces.py --n_subjects 30 # Replace the number according to the number of subjects you want
 
