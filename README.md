@@ -8,28 +8,62 @@
 - Edit facial attributes using InterfaceGAN and GANSpace
 - Perform text-based edits via StyleCLIP (Run gen_faces_styleclip.py for this)
 
-## Example Outputs
-![Original Subject](examples/subject_6abb48ef4a/original.png)
+## Example Outputs Using gen_faces.py
 
-![Young Subject](examples/subject_6abb48ef4a/edited_young.png)
+<figure>
+  <img src="examples/subject_6abb48ef4a/original.png" alt="Original Subject" width="300">
+  <figcaption>Original Subject</figcaption>
+</figure>
 
-![Old Subject](examples/subject_6abb48ef4a/edited_old.png)
+<figure>
+  <img src="examples/subject_6abb48ef4a/edited_smile.png" alt="Original Subject Smiling" width="300">
+  <figcaption>Original Subject Smiling</figcaption>
+</figure>
 
-![Subject Posing Left](examples/subject_6abb48ef4a/edited_pose_left.png)
+<figure>
+  <img src="examples/subject_6abb48ef4a/edited_young.png" alt="Young Subject" width="300">
+  <figcaption>Young Subject</figcaption>
+</figure>
 
-![Subject Posing Right](examples/subject_6abb48ef4a/edited_pose_right.png)
+<figure>
+  <img src="examples/subject_6abb48ef4a/edited_old.png" alt="Old Subject" width="300">
+  <figcaption>Old Subject</figcaption>
+</figure>
 
-![Subject Tilting Up](examples/subject_6abb48ef4a/edited_pose_tilt_down.png)
+<figure>
+  <img src="examples/subject_6abb48ef4a/edited_pose_left.png" alt="Subject Posing Left" width="300">
+  <figcaption>Subject Posing Left</figcaption>
+</figure>
 
-![Subject Tilting Down](examples/subject_6abb48ef4a/edited_pose_tilt_up.png)
+<figure>
+  <img src="examples/subject_6abb48ef4a/edited_pose_right.png" alt="Subject Posing Right" width="300">
+  <figcaption>Subject Posing Right</figcaption>
+</figure>
 
-![Original Subject Smiling](examples/subject_6abb48ef4a/edited_smile.png)
+<figure>
+  <img src="examples/subject_6abb48ef4a/edited_pose_tilt_up.png" alt="Subject Tilting Up" width="300">
+  <figcaption>Subject Tilting Up</figcaption>
+</figure>
 
-![Original Under Different Lighting](examples/subject_6abb48ef4a/edited_light_0.png)
+<figure>
+  <img src="examples/subject_6abb48ef4a/edited_pose_tilt_down.png" alt="Subject Tilting Down" width="300">
+  <figcaption>Subject Tilting Down</figcaption>
+</figure>
 
-![Original Under Different Lighting](examples/subject_6abb48ef4a/edited_light_1.png)
+<figure>
+  <img src="examples/subject_6abb48ef4a/edited_light_0.png" alt="Original Under Different Lighting" width="300">
+  <figcaption>Original Under Different Lighting</figcaption>
+</figure>
 
-![Original Under Different Lighting](examples/subject_6abb48ef4a/edited_light_2.png)
+<figure>
+  <img src="examples/subject_6abb48ef4a/edited_light_1.png" alt="Original Under Different Lighting" width="300">
+  <figcaption>Original Under Different Lighting</figcaption>
+</figure>
+
+<figure>
+  <img src="examples/subject_6abb48ef4a/edited_light_2.png" alt="Original Under Different Lighting" width="300">
+  <figcaption>Original Under Different Lighting</figcaption>
+</figure>
 
 ## Technologies Used
 
@@ -54,4 +88,4 @@ conda activate stylegan3
 # Run the following command
 python gen_faces.py --n_subjects 30 # Replace the number according to the number of subjects you want
 
-#To run our version using StyleCLIP simply 
+#To run our version using StyleCLIP simply run gen_faces_styleclip.py instead of gen_faces.py
