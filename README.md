@@ -6,8 +6,7 @@
 
 - Generate realistic human faces using StyleGAN3
 - Edit facial attributes using InterfaceGAN and GANSpace
-- Perform text-based edits via StyleCLIP
-- Modular and scriptable for custom use cases
+- Perform text-based edits via StyleCLIP (Run gen_faces_styleclip.py for this)
 
 ## Technologies Used
 
@@ -25,5 +24,9 @@ Clone the repo and install dependencies:
 git clone https://github.com/nilamsofie/FaceGen.git
 cd FaceGen
 
-# Install required packages
-pip install -r requirements.txt
+# Create the required conda environment
+conda env create -f stylegan3/environment.yml
+conda activate stylegan3
+
+# Run the following command
+python gen_faces.py --n_subjects 30 # Replace the number according to the number of subjects you want
