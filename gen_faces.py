@@ -2,150 +2,124 @@ import sys
 import os
 import numpy as np
 import torch
-import subprocess
 import pickle
+import argparse
+import hashlib
 from pathlib import Path
 from PIL import Image
-#from ganspace.pca import PAC
 
-# Ensure StyleGAN3 can be found
+# Directories and paths
 STYLEGAN3_DIR = "stylegan3"
-sys.path.append(STYLEGAN3_DIR)
-
-# Paths
-STYLEGAN3_DIR = "stylegan3"
-INTERFACEGAN_DIR = "interfacegan"
-MODEL_PATH = "stylegan3/models/stylegan3-r-ffhq-1024x1024.pkl"  
+MODEL_PATH = "stylegan3/models/stylegan3-r-ffhq-1024x1024.pkl"
 OUTPUT_DIR = "outputs"
-#Paths for boundaries
-AGE_PATH = "boundaries/stylegan_ffhq_age_c_gender_boundary.npy"
+
+# InterFaceGAN Boundaries
+AGE_PATH = "boundaries/stylegan_ffhq_age_w_boundary.npy"
 POSE_PATH = "boundaries/stylegan_ffhq_pose_w_boundary.npy"
 POSE2_PATH = "boundaries/stylegan_ffhq_pose_boundary.npy"
 SMILE_PATH = "boundaries/stylegan_ffhq_smile_w_boundary.npy"
-#Paths from ganspace
-RGB_PATH = "ganspace/notebooks/data/steerability/stylegan_ffhq/ffhq_rgb_0.npy"
-RGB1_PATH = "ganspace/notebooks/data/steerability/stylegan_ffhq/ffhq_rgb_1.npy"
-RGB2_PATH = "ganspace/notebooks/data/steerability/stylegan_ffhq/ffhq_rgb_2.npy"
-#Biggan deep
-LINEAR_SHIFT_PATH = "ganspace/notebooks/data/steerability/biggan_deep_512/gan_steer-linear_shiftx_512.pkl"
-LINEAR_ZOOM_PATH = "ganspace/notebooks/data/steerability/biggan_deep_512/gan_steer-linear_zoom_512.pkl"
-#Stylegan cars
-ROTATE_PATH = "ganspace/notebooks/data/steerability/stylegan_cars/rotate2d.npy"
-SHIFTY_PATH = "ganspace/notebooks/data/steerability/stylegan_cars/shifty.npy"
 
+# GANSpace directions
+RGB_PATH = "steerability/stylegan_ffhq/ffhq_rgb_0.npy"
 
-# Ensure output directory exists
+# Ensure paths work
+sys.path.append(STYLEGAN3_DIR)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Load StyleGAN3 model
 def load_stylegan3():
+    print("Loading StyleGAN3 model...")
     with open(MODEL_PATH, 'rb') as f:
-        G = pickle.load(f)['G_ema'].cuda()  # Load the generator
+        G = pickle.load(f)['G_ema'].cuda()
+    print("Model loaded.")
     return G
-
 
 # Generate a random latent vector
 def generate_latent(G, truncation=0.5):
-    z = torch.randn(1, G.z_dim).cuda()  # Generate latent in Z-space
-    w = G.mapping(z, None)  # Map Z to W-space
-
-    # Apply truncation
+    z = torch.randn(1, G.z_dim).cuda()
+    w = G.mapping(z, None)
     w_avg = G.mapping.w_avg
     w = w_avg + truncation * (w - w_avg)
-
-    # Force correct W+ shape (1, 16, 512)
-    w_plus = w[:, :16, :]  # Slice only first 16 layers if more exist
-
-    #print("Generated latent shape:", w_plus.shape)  # Debugging
+    w_plus = w[:, :16, :]
     return w_plus
-
 
 # Generate an image
 def generate_image(G, latent, output_path):
     img = G.synthesis(latent, noise_mode='const')
-    img = (img.clamp(-1, 1) + 1) / 2 * 255  # Normalize
+    img = (img.clamp(-1, 1) + 1) / 2 * 255
     img = img.permute(0, 2, 3, 1).cpu().numpy().astype(np.uint8)[0]
-    from PIL import Image
     Image.fromarray(img).save(output_path)
 
-
-# Modify latent with InterfaceGAN
+# Edit latent with InterfaceGAN
 def edit_with_interfacegan(latent, direction_path, factor=10.0):
     direction = np.load(direction_path)
-
-    # Ensure direction shape is (512,) or (1, 512)
     if len(direction.shape) == 1:
-        direction = direction[np.newaxis, :]  # Convert (512,) to (1, 512)
-
+        direction = direction[np.newaxis, :]
     direction = torch.tensor(direction).cuda()
+    direction = direction.unsqueeze(1).repeat(1, 16, 1)
+    return latent + factor * direction
 
-    # Expand direction to (1, 16, 512) to match latent
-    direction = direction.unsqueeze(1).repeat(1, 16, 1)  # Expand along 16 layers
-
-    #print("Direction shape after expansion:", direction.shape)  # Debugging
-    #print("Latent shape before edit:", latent.shape)  # Debugging
-
-    new_latent = latent + factor * direction  # Apply edit
-
-    #print("Latent shape after edit:", new_latent.shape)  # Debugging
-    return new_latent
-
-
+# Modify latent with GanSpace
 def edit_with_ganspace(latent, direction_path, component_index, strength=3.0):
     pca_components = np.load(direction_path)
     pca_components = torch.tensor(pca_components).cuda()
     direction = pca_components[component_index]
-    new_latent = latent + strength * direction
-    return new_latent
+    return latent + strength * direction
 
+# Hash latent for folder naming
+def latent_to_hash(latent_tensor):
+    latent_np = latent_tensor.detach().cpu().float().numpy()
+    latent_bytes = latent_np.tobytes()
+    latent_hash = hashlib.sha256(latent_bytes).hexdigest()
+    return latent_hash[:10]
+
+# Main
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--n_subjects', type=int, default=1)
+    args = parser.parse_args()
+
     G = load_stylegan3()
-    latent = generate_latent(G)
-    
-    original_img_path = os.path.join(OUTPUT_DIR, "original.png")
 
-    #Test if direction is (1, 512)
-    direction = np.load(AGE_PATH)
-    print("Direction shape:", direction.shape)
+    for i in range(args.n_subjects):
+        try:
+            latent = generate_latent(G)
+            latent_hash = latent_to_hash(latent)
+            subject_dir = os.path.join(OUTPUT_DIR, f"subject_{latent_hash}")
+            os.makedirs(subject_dir, exist_ok=True)
+            print(f"[{i+1}/{args.n_subjects}] Generating subject: {subject_dir}")
 
-    #print("Final edited latent shape:", edited_latent.shape)
-    generate_image(G, latent, original_img_path)
-    print(f"Generated image saved at {original_img_path}")
+            # Save latent
+            np.save(os.path.join(subject_dir, "latent.npy"), latent.detach().cpu().numpy())
 
-    # Reset pose before making edits
-    #reset_pose_latent = edit_with_interfacegan(latent, POSE2_PATH, factor=0.0)  # Neutral position
+            # Original image
+            generate_image(G, latent, os.path.join(subject_dir, "original.png"))
 
-    # Now apply different poses
-    pose_variations = [(-6, "pose_left", POSE_PATH), (6, "pose_right", POSE_PATH), (-6, "pose_tilt_down", POSE2_PATH), (6, "pose_tilt_up", POSE2_PATH), (4, "shifty", SHIFTY_PATH), (-4, "rotate", SHIFTY_PATH)]
+            # Poses
+            pose_variations = [
+                (-6, "pose_left", POSE_PATH),
+                (6, "pose_right", POSE_PATH),
+                (-6, "pose_tilt_down", POSE2_PATH),
+                (6, "pose_tilt_up", POSE2_PATH)
+            ]
+            for factor, name, path in pose_variations:
+                edited_latent = edit_with_interfacegan(latent, path, factor)
+                generate_image(G, edited_latent, os.path.join(subject_dir, f"edited_{name}.png"))
 
-    for factor, name, path in pose_variations:
-        edited_latent = edit_with_interfacegan(latent, path, factor=factor)
-        pose_img_path = os.path.join(OUTPUT_DIR, f"edited_{name}.png")
-        generate_image(G, edited_latent, pose_img_path)
-        print(f"Edited pose image saved at {pose_img_path}")
+            # Lighting
+            for j, (comp, strength) in enumerate([(4, 3), (5, 3), (6, 3)]):
+                edited_latent = edit_with_ganspace(latent, RGB_PATH, comp, strength)
+                generate_image(G, edited_latent, os.path.join(subject_dir, f"edited_light_{j}.png"))
 
+            # Smile
+            smile_latent = edit_with_interfacegan(latent, SMILE_PATH, 8.0)
+            generate_image(G, smile_latent, os.path.join(subject_dir, "edited_smile.png"))
 
-    # Lighting variations using GANSpace
-    for i, (comp, strength) in enumerate([(4, 3), (5, 3), (6, 3)]):
-        edited_latent = edit_with_ganspace(latent, RGB_PATH, component_index=comp, strength=strength)
-        light_img_path = os.path.join(OUTPUT_DIR, f"edited_light_{i}.png")
-        generate_image(G, edited_latent, light_img_path)
-        print(f"Edited lighting image saved at {light_img_path}")
+            # Age
+            old_latent = edit_with_interfacegan(latent, AGE_PATH, 7.0)
+            young_latent = edit_with_interfacegan(latent, AGE_PATH, -7.0)
+            generate_image(G, old_latent, os.path.join(subject_dir, "edited_old.png"))
+            generate_image(G, young_latent, os.path.join(subject_dir, "edited_young.png"))
 
-    # Expressions
-    smile_latent = edit_with_interfacegan(latent, SMILE_PATH, factor=8.0)  
-    smile_img_path = os.path.join(OUTPUT_DIR, "edited_smile.png")
-    generate_image(G, smile_latent, smile_img_path)
-    print(f"Edited smile image saved at {smile_img_path}")
-
-    #Generate an image where the subject is older
-    old_img_path = os.path.join(OUTPUT_DIR, "edited_old.png")
-    edited_latent = edit_with_interfacegan(latent, AGE_PATH, factor=7.0)  # Change factor as you'd like
-    generate_image(G, edited_latent, old_img_path)
-    print(f"Edited image saved at {old_img_path}")
-
-    #Generate an image where the subject is younger
-    young_img_path = os.path.join(OUTPUT_DIR, "edited_young.png")
-    edited_latent = edit_with_interfacegan(latent, AGE_PATH, factor=-7.0)  # Change factor as you'd like
-    generate_image(G, edited_latent, young_img_path)
-    print(f"Edited image saved at {young_img_path}")
+        except Exception as e:
+            print(f"Error generating subject {i}: {e}")
